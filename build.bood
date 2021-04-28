@@ -23,3 +23,16 @@ go_tested_binary {
 }
 
 // TODO: Додайте модуль для інтеграційних тестів.
+go_tested_binary {
+  name: "integration-tests",
+  pkg: "github.com/G-V-G/2.l2/integration",
+  srcs: [
+    "httptools/**/*.go",
+    "signal/**/*.go",
+    "cmd/lb/*.go"
+  ],
+  testPkg: "github.com/G-V-G/2.l2/integration",
+  testSrcs: ["balancer_test.go"],
+  optionalTest: true,
+  optionalBuild: true
+}
