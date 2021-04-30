@@ -4,24 +4,24 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"hash"
+	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
 	"time"
-	"hash"
-	"hash/fnv"
 
 	"github.com/G-V-G/2.l2/httptools"
 	"github.com/G-V-G/2.l2/signal"
 )
 
 var (
-	port = flag.Int("port", 8090, "load balancer port")
-	timeoutSec = flag.Int("timeout-sec", 3, "request timeout time in seconds")
-	https = flag.Bool("https", false, "whether backends support HTTPs")
-	traceEnabled = flag.Bool("trace", false, "whether to include tracing information into responses")
-	timeout = time.Duration(*timeoutSec) * time.Second
-	serversPool = []string{
+	port         = flag.Int("port", 8090, "load balancer port")
+	timeoutSec   = flag.Int("timeout-sec", 3, "request timeout time in seconds")
+	https        = flag.Bool("https", false, "whether backends support HTTPs")
+	traceEnabled = flag.Bool("trace", true, "whether to include tracing information into responses")
+	timeout      = time.Duration(*timeoutSec) * time.Second
+	serversPool  = []string{
 		"server1:8080",
 		"server2:8080",
 		"server3:8080",
@@ -38,7 +38,7 @@ func scheme() string {
 func health(dst string) bool {
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	req, _ := http.NewRequestWithContext(ctx, "GET",
-	fmt.Sprintf("%s://%s/health", scheme(), dst), nil)
+		fmt.Sprintf("%s://%s/health", scheme(), dst), nil)
 	if resp, err := http.DefaultClient.Do(req); err != nil {
 		return false
 	} else {
@@ -53,7 +53,7 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 	fwdRequest.URL.Host = dst
 	fwdRequest.URL.Scheme = scheme()
 	fwdRequest.Host = dst
-	
+
 	resp, err := http.DefaultClient.Do(fwdRequest)
 	if err != nil {
 		log.Printf("Failed to get response from %s: %s", dst, err)
@@ -88,7 +88,7 @@ func hashPath(urlPath string) uint64 {
 func balance(healthPool *HostsHealth, url string) (string, error) {
 	healthyHosts := healthPool.GetHealthy()
 	healthyAmount := len(healthyHosts)
-	if (healthyAmount == 0) {
+	if healthyAmount == 0 {
 		return "", fmt.Errorf("no servers available")
 	}
 	idx := hashPath(url) % uint64(healthyAmount)
