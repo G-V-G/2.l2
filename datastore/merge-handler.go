@@ -94,7 +94,7 @@ func (mh *MergeHandler) merge() (closed bool) {
 
 		for key, offset := range hash {
 			if _, found := segmentHash[key]; !found {
-				if value, err := searchValue(mergable, offset); err != nil {
+				if value, _, err := searchValue(mergable, offset); err != nil {
 					mergable.Close()
 					mh.Res <- err
 					return
@@ -102,6 +102,7 @@ func (mh *MergeHandler) merge() (closed bool) {
 					e := entry{
 						key:   key,
 						value: value,
+						sum: getHashSum(key, value),
 					}
 					encoded := e.Encode()
 					if n, err := segment.Write(encoded); err != nil {
