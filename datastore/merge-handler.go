@@ -1,28 +1,29 @@
 package datastore
 
 import (
-	"sync"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"fmt"
+	"sync"
 )
 
 func NewMergeHandler(storageParams *storageEntries, mtx *sync.Mutex) *MergeHandler {
 	return &MergeHandler{
-		Req: make(chan bool),
-		Res: make(chan error),
-		closed: make(chan bool),
+		Req:           make(chan bool),
+		Res:           make(chan error),
+		closed:        make(chan bool),
 		storageParams: storageParams,
-		mtx: mtx,
+		mtx:           mtx,
 	}
 }
 
 type MergeHandler struct {
-	Req chan bool
-	Res chan error
+	Req           chan bool
+	Res           chan error
 	storageParams *storageEntries
-	mtx *sync.Mutex
-	closed chan bool
+	mtx           *sync.Mutex
+	closed        chan bool
 }
 
 func (mh *MergeHandler) StartLoop() {
@@ -48,13 +49,13 @@ func (mh *MergeHandler) merge() (closed bool) {
 	if !more {
 		closed = true
 		return
-	} 
+	}
 	mh.mtx.Lock()
 	keys := getSortedKeys(mh.storageParams.index)
 	mh.mtx.Unlock()
 
 	dir := filepath.Dir(mh.storageParams.out)
-	container, err := os.MkdirTemp(dir, containerName)
+	container, err := ioutil.TempDir(dir, containerName)
 	if err != nil {
 		mh.Res <- err
 		return
@@ -65,7 +66,7 @@ func (mh *MergeHandler) merge() (closed bool) {
 	mh.mtx.Unlock()
 	segmentName := fmt.Sprintf("%d-segment", mh.storageParams.segmentCounter)
 	segmentPath := filepath.Join(container, segmentName)
-	segment, err := os.Create(segmentPath);
+	segment, err := os.Create(segmentPath)
 	if err != nil {
 		mh.Res <- err
 		return
@@ -102,7 +103,7 @@ func (mh *MergeHandler) merge() (closed bool) {
 					e := entry{
 						key:   key,
 						value: value,
-						sum: getHashSum(key, value),
+						sum:   getHashSum(key, value),
 					}
 					encoded := e.Encode()
 					if n, err := segment.Write(encoded); err != nil {

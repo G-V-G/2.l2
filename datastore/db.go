@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,13 +13,13 @@ import (
 )
 
 type Db struct {
-	out *os.File
-	outOffset int64
-	maxSize int64
-	params *storageEntries
+	out          *os.File
+	outOffset    int64
+	maxSize      int64
+	params       *storageEntries
 	mergeHandler *MergeHandler
 	writeHandler *WriteHandler
-	mtx sync.Mutex
+	mtx          sync.Mutex
 }
 
 func NewDb(dir string, sizeBytes int64) (*Db, error) {
@@ -27,19 +28,19 @@ func NewDb(dir string, sizeBytes int64) (*Db, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	list, err := listStorageEntries(dir)
 	if err != nil {
 		return nil, err
 	}
 	container := ""
-  for _, name := range list {
-    if strings.HasPrefix(name, containerName) {
+	for _, name := range list {
+		if strings.HasPrefix(name, containerName) {
 			container = name
 		}
-  }
+	}
 	if container == "" {
-		dirPath, err := os.MkdirTemp(dir, containerName)
+		dirPath, err := ioutil.TempDir(dir, containerName)
 		if err != nil {
 			return nil, err
 		}
@@ -47,15 +48,15 @@ func NewDb(dir string, sizeBytes int64) (*Db, error) {
 	}
 
 	storageEntries := &storageEntries{
-		index: make(indexes),
-		out: outputPath,
+		index:     make(indexes),
+		out:       outputPath,
 		container: filepath.Join(dir, container),
 	}
 
 	db := &Db{
 		out:     f,
 		maxSize: sizeBytes,
-		params: storageEntries,
+		params:  storageEntries,
 	}
 	db.mergeHandler = NewMergeHandler(storageEntries, &db.mtx)
 	db.writeHandler = NewWriteHandler(db.onWriteListener)
@@ -100,13 +101,13 @@ func (db *Db) execRecover(dirEntries []string) error {
 			return err
 		}
 		defer input.Close()
-	
+
 		var buf [bufSize]byte
 		in := bufio.NewReaderSize(input, bufSize)
 		for err == nil {
 			var (
 				header, data []byte
-				n int
+				n            int
 			)
 			header, err = in.Peek(bufSize)
 			if err == io.EOF {
@@ -117,25 +118,25 @@ func (db *Db) execRecover(dirEntries []string) error {
 				return err
 			}
 			size := binary.LittleEndian.Uint32(header)
-	
+
 			if size < bufSize {
 				data = buf[:size]
 			} else {
 				data = make([]byte, size)
 			}
 			n, err = in.Read(data)
-	
+
 			if err == nil {
 				if n != int(size) {
 					return fmt.Errorf("corrupted file")
 				}
-	
+
 				var e entry
 				e.Decode(data)
 				if err := compareHash(e.key, e.value, e.sum); err != nil {
 					return err
 				}
-			
+
 				db.params.index[name][e.key] = currentOffset
 				currentOffset += int64(n)
 			}
@@ -147,7 +148,7 @@ func (db *Db) execRecover(dirEntries []string) error {
 	return nil
 }
 
-func (db *Db) Close() error {	
+func (db *Db) Close() error {
 	if err := db.out.Close(); err != nil {
 		return err
 	}
@@ -207,7 +208,7 @@ func (db *Db) Put(key, value string) error {
 	e := entry{
 		key:   key,
 		value: value,
-		sum:	 getHashSum(key, value),
+		sum:   getHashSum(key, value),
 	}
 	db.writeHandler.Req <- e
 	err := <-db.writeHandler.Res
@@ -219,7 +220,7 @@ func (db *Db) onWriteListener() (closed bool) {
 	if !more {
 		closed = true
 		return
-	} 
+	}
 	encoded := e.Encode()
 
 	f, err := os.Stat(db.params.out)
@@ -227,7 +228,7 @@ func (db *Db) onWriteListener() (closed bool) {
 		db.writeHandler.Res <- err
 		return
 	}
-	if f.Size() + int64(len(encoded)) >= db.maxSize {
+	if f.Size()+int64(len(encoded)) >= db.maxSize {
 		db.mtx.Lock()
 		db.params.segmentCounter++
 		db.mtx.Unlock()
@@ -237,7 +238,7 @@ func (db *Db) onWriteListener() (closed bool) {
 			db.writeHandler.Res <- err
 			return
 		}
-		if err := os.Rename(db.params.out, newPath); err != nil { 
+		if err := os.Rename(db.params.out, newPath); err != nil {
 			db.writeHandler.Res <- err
 			return
 		}

@@ -39,7 +39,10 @@ func health(dst string) bool {
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	req, _ := http.NewRequestWithContext(ctx, "GET",
 		fmt.Sprintf("%s://%s/health", scheme(), dst), nil)
+	s := fmt.Sprintf("%s://%s/health", scheme(), dst)
+	log.Println(s)
 	if resp, err := http.DefaultClient.Do(req); err != nil {
+		log.Println(err.Error())
 		return false
 	} else {
 		return resp.StatusCode == http.StatusOK
@@ -93,6 +96,11 @@ func balance(healthPool *HostsHealth, url string) (string, error) {
 	}
 	idx := hashPath(url) % uint64(healthyAmount)
 	return healthyHosts[idx], nil
+}
+
+type OutData struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 func main() {

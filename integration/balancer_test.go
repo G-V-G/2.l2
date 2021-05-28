@@ -1,9 +1,9 @@
 package integration
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"testing"
 	"time"
 
@@ -11,40 +11,30 @@ import (
 )
 
 const baseAddress = "http://balancer:8090"
+const serverAddress = "http://server1:8080/test?key="
 
 var client = http.Client{
 	Timeout: 3 * time.Second,
 }
 
-func TestBalancer(t *testing.T) {
-	for i := 0; i < 3; i++ {
-		route := fmt.Sprintf("%s/server%s", baseAddress, strconv.Itoa(i))
-		resp, err := client.Get(route)
-		assert.Nil(t, err)
-		compare := resp.Header.Get("lb-from")
-		for j := 0; j < 5; j++ {
-			resp, err = client.Get(route)
-			assert.Equal(t, compare, resp.Header.Get("lb-from"))
-			assert.Nil(t, err)
-		}
-	}
+type OutData struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
-func BenchmarkBalancer(b *testing.B) {
-	var timeForQueries int64 = 0
-	iterations := b.N
-	for i := 0; i < 3; i++ {
-		route := fmt.Sprintf("%s/server%s", baseAddress, strconv.Itoa(i))
-		resp, err := client.Get(route)
-		assert.Nil(b, err)
-		compare := resp.Header.Get("lb-from")
-		for j := 0; j < iterations; j++ {
-			start := time.Now()
-			resp, err = client.Get(route)
-			timeForQueries += time.Since(start).Nanoseconds()
-			assert.Equal(b, compare, resp.Header.Get("lb-from"))
-			assert.Nil(b, err)
-		}
-	}
-	fmt.Printf("\naverage query time: %s\n", strconv.Itoa(int(timeForQueries)/iterations))
+func TestBalancer(t *testing.T) {
+	route := fmt.Sprintf("%s/api/v1/some-data?key=g-v-g", baseAddress)
+	time.Sleep(10 * time.Second)
+	response, err := client.Get(route)
+	assert.Nil(t, err)
+	compare := response.Header.Get("lb-from")
+	assert.Equal(t, compare, response.Header.Get("lb-from"))
+	assert.Nil(t, err)
+	assert.Equal(t, response.StatusCode, http.StatusOK)
+	defer response.Body.Close()
+	var incoming OutData
+	err = json.NewDecoder(response.Body).Decode(&incoming)
+	assert.Equal(t, incoming.Key, "g-v-g")
+	assert.Equal(t, incoming.Value, time.Now().Format("01-02-2006"))
+	assert.Nil(t, err)
 }

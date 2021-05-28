@@ -1,0 +1,18 @@
+2021/05/28 08:11:41 http://balancer:8090/api/v1/some-data?key=g-v-g
+--- FAIL: TestBalancer (0.02s)
+    balancer_test.go:40: 
+        	Error Trace:	balancer_test.go:40
+        	Error:      	Not equal: 
+        	            	expected: "05-28-2021"
+        	            	actual  : "g-v-g"
+        	            	
+        	            	Diff:
+        	            	--- Expected
+        	            	+++ Actual
+        	            	@@ -1 +1 @@
+        	            	-05-28-2021
+        	            	+g-v-g
+        	Test:       	TestBalancer
+FAIL
+FAIL	github.com/G-V-G/2.l2/integration	0.021s
+FAIL

@@ -22,6 +22,18 @@ go_tested_binary {
   testSrcs: ["**/*_test.go"]
 }
 
+ go_tested_binary {
+  name: "db",
+  pkg: "github.com/G-V-G/2.l2/cmd/db",
+  srcs: [
+    "httptools/**/*.go",
+    "signal/**/*.go",
+    "cmd/lb/*.go"
+  ],
+  testPkg: "github.com/G-V-G/2.l2/cmd/db",
+  testSrcs: ["**/*_test.go"]
+}
+
 // TODO: Додайте модуль для інтеграційних тестів.
 go_tested_binary {
   name: "integration-tests",
