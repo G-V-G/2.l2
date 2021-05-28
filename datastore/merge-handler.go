@@ -50,9 +50,7 @@ func (mh *MergeHandler) merge() (closed bool) {
 		closed = true
 		return
 	}
-	mh.mtx.Lock()
 	keys := getSortedKeys(mh.storageParams.index)
-	mh.mtx.Unlock()
 
 	dir := filepath.Dir(mh.storageParams.out)
 	container, err := ioutil.TempDir(dir, containerName)
@@ -128,6 +126,7 @@ func (mh *MergeHandler) merge() (closed bool) {
 	mh.storageParams.container = container
 	for _, key := range keys {
 		if key != mh.storageParams.out {
+			// safely deleting old hash indices
 			delete(mh.storageParams.index, key)
 		}
 	}

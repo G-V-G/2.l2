@@ -176,15 +176,17 @@ func (db *Db) Close() error {
 }
 
 func (db *Db) Get(key string) (string, error) {
-	db.mtx.Lock()
-	defer db.mtx.Unlock()
-	keys := getSortedKeys(db.params.index)
-	for i := len(keys) - 1; i >= 0; i-- {
-		fileName := keys[i]
-		position, ok := db.params.index[fileName][key]
-		if !ok {
-			continue
-		}
+  keys := getSortedKeys(db.params.index)
+  db.mtx.Lock()
+  // local copy for safe get operation
+  dbIndex := db.params.index
+  db.mtx.Unlock()
+  for i := len(keys) - 1; i >= 0; i-- {
+    fileName := keys[i]
+    position, ok := dbIndex[fileName][key]
+    if !ok {
+      continue
+    }
 
 		file, err := os.Open(fileName)
 		if err != nil {
