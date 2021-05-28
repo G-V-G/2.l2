@@ -8,64 +8,63 @@ import (
 	"os"
 
 	"github.com/G-V-G/2.l2/datastore"
+	"github.com/G-V-G/2.l2/signal"
 )
 
 type InData struct {
-	Value string
+	Value string	`json:"value"`
 }
 
 type OutData struct {
-	Key   string
-	Value string
+	Key   string	`json:"key"`
+	Value string	`json:"value"`
 }
 
 const port string = "8091"
 const path string = "./out/storage/"
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	key := r.URL.Path[len("/db/"):]
-	const sizeBytes int64 = datastore.MaxFileSizeMb * 1024 * 1024
-	db, err := datastore.NewDb("out/storage/", sizeBytes)
-	if err != nil {
-		panic(err)
-	}
-	var c InData
-	if r.Method == "POST" {
-		defer r.Body.Close()
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			panic(err)
-		}
-		err = json.Unmarshal(body, &c)
-		if err != nil {
-			panic(err)
-		}
-		err = db.Put(key, c.Value)
-		if err != nil {
-			if err.Error() == "ErrHashSums" {
-				http.Error(w, "{}", http.StatusUnprocessableEntity)
+func dbHandler(db *datastore.Db) func (http.ResponseWriter, *http.Request) {
+	return func (w http.ResponseWriter, r *http.Request) {
+		key := r.URL.Path[len("/db/"):]
+		var c InData
+		if r.Method == "POST" {
+			defer r.Body.Close()
+			body, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "{}", http.StatusInternalServerError)
 				return
 			}
-			panic(err)
-		}
-	}
-	if r.Method == "GET" {
-		value, err := db.Get(key)
-		if err != nil {
-			if err.Error() == "record does not exist" {
-				http.Error(w, "{}", http.StatusNotFound)
+			if err = json.Unmarshal(body, &c); err != nil {
+				http.Error(w, "{}", http.StatusInternalServerError)
 				return
 			}
-			panic(err)
+			if err = db.Put(key, c.Value); err != nil {
+				http.Error(w, "{}", http.StatusInternalServerError)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
+			return
 		}
-		c.Value = value
-		res, err := json.Marshal(&c)
-		if err != nil {
-			log.Fatal(err)
+
+		if r.Method == "GET" {
+			value, err := db.Get(key)
+			if err != nil {
+				if err == datastore.ErrNotFound || err == datastore.ErrHashSums {
+					http.Error(w, "{}", http.StatusNotFound)
+				} else {
+					http.Error(w, "{}", http.StatusInternalServerError)
+				}
+				return
+			}
+			c.Value = value
+			if res, err := json.Marshal(&c); err != nil {
+				http.Error(w, "{}", http.StatusInternalServerError)
+			} else {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(res)
+			}
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(res)
 	}
 }
 
@@ -76,7 +75,20 @@ func main() {
 			panic(e)
 		}
 	}
-	http.HandleFunc("/db/", handler)
+	sizeBytes := datastore.MaxFileSizeMb * 1024 * 1024
+	db, err := datastore.NewDb(path, int64(sizeBytes))
+	if err != nil {
+		panic(err)
+	} else {
+		defer db.Close()
+	}
+
+	
+	http.HandleFunc("/db/", dbHandler(db))
 	log.Printf("Starting server on " + port + " port...")
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatal(err)
+	} else {
+		signal.WaitForTerminationSignal()
+	}
 }
