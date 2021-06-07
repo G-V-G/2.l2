@@ -58,11 +58,19 @@ func TestBalancer(t *testing.T) {
 	assert.EqualError(t, balancerErr, "no servers available")
 
 	checkHashing := func() {
-		healthyLen := uint64(len(healthPool.GetHealthy()))
+		healthy := healthPool.GetHealthy()
+		healthyLen := uint64(len(healthy))
+		allLen := uint64(len(*healthPool))
 		for _, route := range routes {
 			server, _ := balance(healthPool, route)
-			expectedIndex := hashPath(route) % healthyLen
-			assert.Equal(t, server, serversPool[expectedIndex])
+			hashed := hashPath(route)
+			expectedIndex := hashed % allLen
+			if (*healthPool)[expectedIndex].isHealthy {
+				assert.Equal(t, server, serversPool[expectedIndex])
+			} else {
+				expectedIndexHealthy := hashPath(route) % healthyLen
+				assert.Equal(t, server, healthy[expectedIndexHealthy])
+			}
 		}
 	}
 

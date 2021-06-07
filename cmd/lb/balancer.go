@@ -92,8 +92,15 @@ func balance(healthPool *HostsHealth, url string) (string, error) {
 	if healthyAmount == 0 {
 		return "", fmt.Errorf("no servers available")
 	}
-	idx := hashPath(url) % uint64(healthyAmount)
-	return healthyHosts[idx], nil
+	totalAmount := len(*healthPool)
+	hashed := hashPath(url)
+	idx := hashed % uint64(totalAmount)
+	found := (*healthPool)[idx]
+	if found.isHealthy {
+		return found.addr, nil
+	}
+	idxHealthy := hashed % uint64(healthyAmount)
+	return healthyHosts[idxHealthy], nil
 }
 
 func main() {
